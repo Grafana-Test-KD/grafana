@@ -33,8 +33,9 @@ func TestNewHTTPTransportReturnsDistinctInstances(t *testing.T) {
 
 // requireSameTransportConfig compares every exported field of two transports.
 // Function fields cannot be compared with ==, so they are compared by code
-// pointer, except DialContext, which is a closure over a per-transport dialer
-// and is only checked to be set.
+// pointer. DialContext is a method value bound to a per-transport dialer, but
+// every instance shares the same code pointer, so a replaced dial function is
+// detected.
 func requireSameTransportConfig(t *testing.T, want, got *http.Transport) {
 	t.Helper()
 
@@ -48,9 +49,7 @@ func requireSameTransportConfig(t *testing.T, want, got *http.Transport) {
 		wf, gf := wv.Field(i), gv.Field(i)
 		if wf.Kind() == reflect.Func {
 			require.Equal(t, wf.IsNil(), gf.IsNil(), "field %s", field.Name)
-			if field.Name != "DialContext" {
-				require.Equal(t, wf.Pointer(), gf.Pointer(), "field %s", field.Name)
-			}
+			require.Equal(t, wf.Pointer(), gf.Pointer(), "field %s", field.Name)
 			continue
 		}
 		require.Equal(t, wf.Interface(), gf.Interface(), "field %s", field.Name)
