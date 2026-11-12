@@ -28,6 +28,33 @@ func TestNewHTTPTransportReturnsDistinctInstances(t *testing.T) {
 	b := NewHTTPTransport()
 	require.NotSame(t, a, b)
 	require.NotSame(t, http.DefaultTransport, a)
+	require.NotSame(t, http.DefaultTransport, b)
+}
+
+// requireSameTransportConfig compares every exported field of two transports.
+// Function fields cannot be compared with ==, so they are compared by code
+// pointer, except DialContext, which is a closure over a per-transport dialer
+// and is only checked to be set.
+func requireSameTransportConfig(t *testing.T, want, got *http.Transport) {
+	t.Helper()
+
+	wv := reflect.ValueOf(want).Elem()
+	gv := reflect.ValueOf(got).Elem()
+	for i := 0; i < wv.NumField(); i++ {
+		field := wv.Type().Field(i)
+		if !field.IsExported() {
+			continue
+		}
+		wf, gf := wv.Field(i), gv.Field(i)
+		if wf.Kind() == reflect.Func {
+			require.Equal(t, wf.IsNil(), gf.IsNil(), "field %s", field.Name)
+			if field.Name != "DialContext" {
+				require.Equal(t, wf.Pointer(), gf.Pointer(), "field %s", field.Name)
+			}
+			continue
+		}
+		require.Equal(t, wf.Interface(), gf.Interface(), "field %s", field.Name)
+	}
 }
 
 func TestNew(t *testing.T) {
@@ -38,11 +65,6 @@ func TestNew(t *testing.T) {
 
 	want := NewHTTPTransport().(*http.Transport)
 	require.NotSame(t, want, tr)
-	require.Equal(t, reflect.ValueOf(want.Proxy).Pointer(), reflect.ValueOf(tr.Proxy).Pointer())
 	require.NotNil(t, tr.DialContext)
-	require.Equal(t, want.ForceAttemptHTTP2, tr.ForceAttemptHTTP2)
-	require.Equal(t, want.MaxIdleConns, tr.MaxIdleConns)
-	require.Equal(t, want.IdleConnTimeout, tr.IdleConnTimeout)
-	require.Equal(t, want.TLSHandshakeTimeout, tr.TLSHandshakeTimeout)
-	require.Equal(t, want.ExpectContinueTimeout, tr.ExpectContinueTimeout)
+	requireSameTransportConfig(t, want, tr)
 }
