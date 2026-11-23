@@ -314,3 +314,31 @@ func TestSetViaHeader(t *testing.T) {
 		})
 	}
 }
+
+func TestSetViaHeader(t *testing.T) {
+	tests := []struct {
+		name     string
+		existing string
+		major    int
+		minor    int
+		expected string
+	}{
+		{name: "no existing Via", major: 1, minor: 1, expected: "1.1 grafana"},
+		{name: "existing Via is kept after Grafana", existing: "1.1 upstream", major: 2, minor: 0, expected: "2.0 grafana, 1.1 upstream"},
+		{name: "major 1 minor 0", major: 1, minor: 0, expected: "1.0 grafana"},
+		{name: "major 2 minor 0", major: 2, minor: 0, expected: "2.0 grafana"},
+		{name: "non-zero minor is not swapped", major: 3, minor: 5, expected: "3.5 grafana"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			header := http.Header{}
+			if tt.existing != "" {
+				header.Set("Via", tt.existing)
+			}
+			SetViaHeader(header, tt.major, tt.minor)
+			require.Len(t, header.Values("Via"), 1)
+			require.Equal(t, tt.expected, header.Get("Via"))
+		})
+	}
+}
