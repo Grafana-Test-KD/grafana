@@ -286,3 +286,31 @@ func TestApplyForwardIDHeader(t *testing.T) {
 		require.NotContains(t, req.Header, IDHeaderName)
 	})
 }
+
+func TestSetViaHeader(t *testing.T) {
+	tests := []struct {
+		name     string
+		existing string
+		major    int
+		minor    int
+		expected string
+	}{
+		{"no existing Via", "", 1, 1, "1.1 grafana"},
+		{"existing Via is kept after Grafana", "1.1 upstream", 2, 0, "2.0 grafana, 1.1 upstream"},
+		{"major only", "", 1, 0, "1.0 grafana"},
+		{"major 2 minor 0", "", 2, 0, "2.0 grafana"},
+		{"non-zero minor, not swapped", "", 1, 3, "1.3 grafana"},
+		{"multiple existing entries", "1.0 a, 1.1 b", 3, 2, "3.2 grafana, 1.0 a, 1.1 b"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			header := http.Header{}
+			if tc.existing != "" {
+				header.Set("Via", tc.existing)
+			}
+			SetViaHeader(header, tc.major, tc.minor)
+			require.Len(t, header.Values("Via"), 1)
+			require.Equal(t, tc.expected, header.Get("Via"))
+		})
+	}
+}
